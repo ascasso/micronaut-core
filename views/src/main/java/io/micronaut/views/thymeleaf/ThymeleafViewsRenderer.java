@@ -31,6 +31,7 @@ import io.micronaut.views.exceptions.ViewRenderingException;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.context.IContext;
+import org.thymeleaf.dialect.IDialect;
 import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
@@ -38,8 +39,10 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Renders templates Thymeleaf Java template engine.
@@ -61,6 +64,8 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     protected final TemplateEngine engine;
 
     protected ResourceLoader resourceLoader;
+    
+    protected List<IDialect> dialects;
 
     /**
      * @param viewsConfiguration Views Configuration
@@ -69,9 +74,13 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
      */
     public ThymeleafViewsRenderer(ViewsConfiguration viewsConfiguration,
                                   ThymeleafViewsRendererConfiguration thConfiguration,
-                                  ClassPathResourceLoader resourceLoader) {
+                                  ClassPathResourceLoader resourceLoader,
+                                  Optional<List<IDialect>> thDialects) {
         this.templateResolver = initializeTemplateResolver(viewsConfiguration, thConfiguration);
         this.resourceLoader = resourceLoader;
+        if (thDialects.isPresent()) {
+                this.dialects = thDialects.get();
+        }
         this.engine = initializeTemplateEngine();
     }
 
@@ -98,6 +107,9 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     private TemplateEngine initializeTemplateEngine() {
         TemplateEngine engine = new TemplateEngine();
         engine.setTemplateResolver(templateResolver);
+        if (dialects != null) {
+            dialects.forEach(dialect -> engine.addDialect(dialect));
+        }
         return engine;
     }
 
