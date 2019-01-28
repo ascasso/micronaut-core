@@ -65,7 +65,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
 
     protected ResourceLoader resourceLoader;
     
-    protected List<IDialect> dialects;
+    protected Optional<List<IDialect>> dialects;
 
     /**
      * @param viewsConfiguration Views Configuration
@@ -78,9 +78,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
                                   Optional<List<IDialect>> thDialects) {
         this.templateResolver = initializeTemplateResolver(viewsConfiguration, thConfiguration);
         this.resourceLoader = resourceLoader;
-        if (thDialects.isPresent()) {
-                this.dialects = thDialects.get();
-        }
+        this.dialects = thDialects;
         this.engine = initializeTemplateEngine();
     }
 
@@ -107,9 +105,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     private TemplateEngine initializeTemplateEngine() {
         TemplateEngine engine = new TemplateEngine();
         engine.setTemplateResolver(templateResolver);
-        if (dialects != null) {
-            dialects.forEach(dialect -> engine.addDialect(dialect));
-        }
+        dialects.ifPresent(ds -> ds.forEach(engine::addDialect));
         return engine;
     }
 
