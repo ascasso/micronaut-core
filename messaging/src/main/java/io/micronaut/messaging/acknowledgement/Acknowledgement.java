@@ -14,29 +14,23 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.replaces;
-
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.docs.requires.Book;
-
-import javax.inject.Singleton;
-import java.util.LinkedHashMap;
-import java.util.Map;
+package io.micronaut.messaging.acknowledgement;
 
 /**
- * @author graemerocher
- * @since 1.0
+ * A contract that allows for responding to messages.
+ *
+ * @author James Kleeh
+ * @since 1.1.0
  */
-// tag::class[]
-@Replaces(JdbcBookService.class) // <1>
-@Singleton
-public class MockBookService implements BookService {
+public interface Acknowledgement {
 
-    Map<String, Book> bookMap = new LinkedHashMap<>();
+    /**
+     * Acknowledges the message.
+     */
+    void ack();
 
-    @Override
-    public Book findBook(String title) {
-        return bookMap.get(title);
-    }
+    /**
+     * Rejects the message.
+     */
+    void nack();
 }
-// tag::class[]

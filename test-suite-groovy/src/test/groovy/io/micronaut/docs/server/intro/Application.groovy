@@ -13,30 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.docs.server.intro
 
-package io.micronaut.docs.replaces;
-
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.docs.requires.Book;
-
-import javax.inject.Singleton;
-import java.util.LinkedHashMap;
-import java.util.Map;
+// tag::imports[]
+import io.micronaut.runtime.Micronaut
+// end::imports[]
 
 /**
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
 // tag::class[]
-@Replaces(JdbcBookService.class) // <1>
-@Singleton
-public class MockBookService implements BookService {
+class Application {
 
-    Map<String, Book> bookMap = new LinkedHashMap<>();
-
-    @Override
-    public Book findBook(String title) {
-        return bookMap.get(title);
+    static void main(String... args) {
+        Micronaut.run Application.class
     }
 }
-// tag::class[]
+// end::class[]
