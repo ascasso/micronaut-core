@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -1047,16 +1046,19 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             if (readTimeout.isPresent()) {
                 // add an additional second, because generally the timeout should occur
                 // from the Netty request handling pipeline
-                Duration duration = readTimeout.get().plus(Duration.ofSeconds(1));
-                finalFlowable = finalFlowable.timeout(
-                        duration.toMillis(),
-                        TimeUnit.MILLISECONDS
-                ).onErrorResumeNext(throwable -> {
-                    if (throwable instanceof TimeoutException) {
-                        return Flowable.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
-                    }
-                    return Flowable.error(throwable);
-                });
+                final Duration rt = readTimeout.get();
+                if (!rt.isNegative()) {
+                    Duration duration = rt.plus(Duration.ofSeconds(1));
+                    finalFlowable = finalFlowable.timeout(
+                            duration.toMillis(),
+                            TimeUnit.MILLISECONDS
+                    ).onErrorResumeNext(throwable -> {
+                        if (throwable instanceof TimeoutException) {
+                            return Flowable.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                        }
+                        return Flowable.error(throwable);
+                    });
+                }
             }
             return finalFlowable.subscribeOn(scheduler);
         };

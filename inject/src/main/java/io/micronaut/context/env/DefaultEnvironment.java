@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context.env;
 
 import io.micronaut.context.converters.StringArrayToClassArrayConverter;
@@ -73,6 +72,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
     private static final String HEROKU_DYNO = "DYNO";
+    private static final String GOOGLE_APPENGINE_ENVIRONMENT = "GAE_ENV";
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
@@ -592,6 +592,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
                 environments.add(Environment.HEROKU);
                 environments.add(Environment.CLOUD);
+                deduceComputePlatform = false;
+            }
+
+            // deduce GAE
+            if (StringUtils.isNotEmpty(System.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
+                environments.add(Environment.GAE);
+                environments.add(Environment.GOOGLE_COMPUTE);
+                deduceComputePlatform = false;
             }
 
             if (deduceComputePlatform) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cache.interceptor;
 
 import io.micronaut.aop.InterceptPhase;
@@ -423,7 +422,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                         emitter.onNext(o);
                                         emitter.onComplete();
                                     }
-                                });
+                                }, ioExecutor);
                             } else {
                                 CacheKeyGenerator keyGenerator = cacheOperation.getCacheInvalidateKeyGenerator(invalidateOperation);
                                 String[] parameterNames = invalidateOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY);

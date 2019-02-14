@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,6 +75,24 @@ class ReadTimeoutSpec extends Specification {
         e.message == 'Read Timeout'
 
         cleanup:
+        clientContext.close()
+    }
+
+    void "test disable read timeout"() {
+        given:
+
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'-1s')
+        def server = clientContext.getBean(EmbeddedServer).start()
+        RxHttpClient client = clientContext.createBean(RxHttpClient, server.getURL())
+        when:
+        def result = client.retrieve(HttpRequest.GET('/timeout/client'), String).blockingFirst()
+
+        then:
+        result == 'success'
+
+        cleanup:
+        server.stop()
         clientContext.close()
     }
 

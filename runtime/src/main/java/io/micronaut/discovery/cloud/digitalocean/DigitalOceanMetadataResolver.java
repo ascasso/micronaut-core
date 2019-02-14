@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.cloud.digitalocean;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,6 +34,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.populateMetadata;
 import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.*;
 
@@ -105,7 +105,8 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
                 allInterfaces.addAll(privateInterfaces);
                 instanceMetadata.setInterfaces(allInterfaces);
 
-                instanceMetadata.setMetadata(objectMapper.convertValue(metadataJson, Map.class));
+                final Map<?, ?> metadata = objectMapper.convertValue(metadataJson, Map.class);
+                populateMetadata(instanceMetadata, metadata);
                 cachedMetadata = instanceMetadata;
 
                 return Optional.of(instanceMetadata);

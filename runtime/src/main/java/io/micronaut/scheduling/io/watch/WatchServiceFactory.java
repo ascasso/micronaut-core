@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.context.annotation.*;
@@ -54,7 +53,7 @@ public class WatchServiceFactory {
         String name = System.getProperty("os.name").toLowerCase();
         boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
         if (isMacOS) {
-            LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.methvin:directory-watcher' and 'net.java.dev.jna:jna' dependencies to use native file watch");
+            LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.micronaut:micronaut-runtime-osx' dependencies to use native file watch");
         }
         return FileSystems.getDefault().newWatchService();
     }
