@@ -15,15 +15,14 @@
  */
 package io.micronaut.views.thymeleaf;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.views.ViewUtils;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
@@ -32,10 +31,12 @@ import org.thymeleaf.context.Context;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.dialect.IDialect;
 import org.thymeleaf.exceptions.TemplateEngineException;
+import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.List;
@@ -53,15 +54,11 @@ import java.util.Optional;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = ThymeleafViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
-@Requires(classes = TemplateEngine.class)
 @Singleton
 public class ThymeleafViewsRenderer implements ViewsRenderer {
 
-    protected final ClassLoaderTemplateResolver templateResolver;
-
+    protected final AbstractConfigurableTemplateResolver templateResolver;
     protected final TemplateEngine engine;
-
     protected ResourceLoader resourceLoader;
     
     protected Optional<List<IDialect>> dialects;
@@ -71,6 +68,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
      * @param thConfiguration    Thymeleaf template renderer configuration
      * @param resourceLoader     The resource loader
      */
+    @Deprecated
     public ThymeleafViewsRenderer(ViewsConfiguration viewsConfiguration,
                                   ThymeleafViewsRendererConfiguration thConfiguration,
                                   ClassPathResourceLoader resourceLoader,
@@ -79,6 +77,20 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
         this.resourceLoader = resourceLoader;
         this.dialects = thDialects;
         this.engine = initializeTemplateEngine();
+    }
+
+    /**
+     * @param templateResolver   The template resolver
+     * @param templateEngine     The template engine
+     * @param resourceLoader     The resource loader
+     */
+    @Inject
+    public ThymeleafViewsRenderer(AbstractConfigurableTemplateResolver templateResolver,
+                                  TemplateEngine templateEngine,
+                                  ClassPathResourceLoader resourceLoader) {
+        this.templateResolver = templateResolver;
+        this.resourceLoader = resourceLoader;
+        this.engine = templateEngine;
     }
 
     @Override
@@ -137,7 +149,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
 
     private String viewLocation(final String name) {
         return templateResolver.getPrefix() +
-                normalizeFile(name, templateResolver.getSuffix()) +
+                ViewUtils.normalizeFile(name, templateResolver.getSuffix()) +
                 templateResolver.getSuffix();
     }
 }
