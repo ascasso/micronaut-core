@@ -18,17 +18,17 @@ package io.micronaut.jackson;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
-import java.util.Collections;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TimeZone;
+import javax.annotation.Nonnull;
+import java.util.*;
 
 /**
  * Configuration for the Jackson JSON parser.
@@ -44,9 +44,17 @@ public class JacksonConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_ARRAYSIZETHRESHOLD = 100;
+    /**
+     * The property used to enable module scan.
+     */
     public static final String PROPERTY_MODULE_SCAN = "jackson.module-scan";
+    /**
+     * The property used to enable bean introspection.
+     */
+    public static final String PROPERTY_USE_BEAN_INTROSPECTION = "jackson.bean-introspection-module";
 
     private boolean moduleScan = true;
+    private boolean beanIntrospectionModule = false;
     private String dateFormat;
     private Locale locale;
     private TimeZone timeZone;
@@ -58,6 +66,25 @@ public class JacksonConfiguration {
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private PropertyNamingStrategy propertyNamingStrategy = null;
+
+    /**
+     * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
+     * @return True if it should
+     */
+    @Experimental
+    public boolean isBeanIntrospectionModule() {
+        return beanIntrospectionModule;
+    }
+
+    /**
+     * Whether the {@link io.micronaut.core.beans.BeanIntrospection} should be used for reflection free object serialialization/deserialialization.
+     *
+     * @param beanIntrospectionModule True if it should
+     */
+    @Experimental
+    public void setBeanIntrospectionModule(boolean beanIntrospectionModule) {
+        this.beanIntrospectionModule = beanIntrospectionModule;
+    }
 
     /**
      * Whether Jackson modules should be scanned for.
@@ -253,5 +280,56 @@ public class JacksonConfiguration {
      */
     public void setPropertyNamingStrategy(PropertyNamingStrategy propertyNamingStrategy) {
         this.propertyNamingStrategy = propertyNamingStrategy;
+    }
+
+    /**
+     * Constructors a JavaType for the given argument and type factory.
+     * @param type The type
+     * @param typeFactory The type factory
+     * @param <T> The generic type
+     * @return The JavaType
+     */
+    public static <T> JavaType constructType(@Nonnull Argument<T> type, @Nonnull TypeFactory typeFactory) {
+        ArgumentUtils.requireNonNull("type", type);
+        ArgumentUtils.requireNonNull("typeFactory", typeFactory);
+        Map<String, Argument<?>> typeVariables = type.getTypeVariables();
+        JavaType[] objects = toJavaTypeArray(typeFactory, typeVariables);
+        final Class<T> rawType = type.getType();
+        if (ArrayUtils.isNotEmpty(objects)) {
+            final JavaType javaType = typeFactory.constructType(
+                    rawType
+            );
+            if (javaType.isCollectionLikeType()) {
+                return typeFactory.constructCollectionLikeType(
+                        rawType,
+                        objects[0]
+                );
+            } else if (javaType.isMapLikeType()) {
+                return typeFactory.constructMapLikeType(
+                        rawType,
+                        objects[0],
+                        objects[1]
+                );
+            } else if (javaType.isReferenceType()) {
+                return typeFactory.constructReferenceType(rawType, objects[0]);
+            }
+            return typeFactory.constructParametricType(rawType, objects);
+        } else {
+            return typeFactory.constructType(
+                    rawType
+            );
+        }
+    }
+
+    private static JavaType[] toJavaTypeArray(TypeFactory typeFactory, Map<String, Argument<?>> typeVariables) {
+        List<JavaType> javaTypes = new ArrayList<>();
+        for (Argument<?> argument : typeVariables.values()) {
+            if (argument.hasTypeVariables()) {
+                javaTypes.add(typeFactory.constructParametricType(argument.getType(), toJavaTypeArray(typeFactory, argument.getTypeVariables())));
+            } else {
+                javaTypes.add(typeFactory.constructType(argument.getType()));
+            }
+        }
+        return javaTypes.toArray(new JavaType[0]);
     }
 }

@@ -26,6 +26,8 @@ import static javax.lang.model.type.TypeKind.ERROR;
 import static javax.lang.model.type.TypeKind.NONE;
 import static javax.lang.model.type.TypeKind.VOID;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -160,10 +162,11 @@ public class ModelUtils {
      * The constructor inject for the given class element.
      *
      * @param classElement The class element
+     * @param annotationUtils The annotation utilities
      * @return The constructor
      */
     @Nullable
-    ExecutableElement concreteConstructorFor(TypeElement classElement) {
+    public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
         List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
         if (constructors.isEmpty()) {
             return null;
@@ -171,8 +174,11 @@ public class ModelUtils {
         if (constructors.size() == 1) {
             return constructors.get(0);
         }
-        Optional<ExecutableElement> element = constructors.stream().filter(ctor ->
-            Objects.nonNull(ctor.getAnnotation(Inject.class))
+
+        Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
+                    return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
+                }
         ).findFirst();
         if (!element.isPresent()) {
             element = constructors.stream().filter(ctor ->
@@ -224,32 +230,8 @@ public class ModelUtils {
      * @return The class
      */
     Class<?> classOfPrimitiveArrayFor(String primitiveType) {
-        try {
-
-            switch (primitiveType) {
-                case "byte":
-                    return Class.forName("[B");
-                case "int":
-                    return Class.forName("[I");
-                case "short":
-                    return Class.forName("[S");
-                case "long":
-                    return Class.forName("[J");
-                case "float":
-                    return Class.forName("[F");
-                case "double":
-                    return Class.forName("[D");
-                case "char":
-                    return Class.forName("[C");
-                case "boolean":
-                    return Class.forName("[Z");
-                default:
-                    // this can never occur
-                    throw new IllegalArgumentException("Unsupported primitive type " + primitiveType);
-            }
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException(e);
-        }
+        return ClassUtils.arrayTypeForPrimitive(primitiveType)
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported primitive type " + primitiveType));
     }
 
     /**

@@ -25,6 +25,8 @@ import io.micronaut.http.annotation.Patch
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
+import io.reactivex.Single
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -101,11 +103,14 @@ class BlockingCrudSpec extends Specification {
 
         when:
         book = client.update(book.id, "The Shining")
+        books = client.list()
 
         then:
         book != null
         book.title == "The Shining"
         book.id == 1
+        books.size() == 1
+        books.first() instanceof Book
 
         when:
         client.delete(book.id)

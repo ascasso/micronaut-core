@@ -3,7 +3,7 @@ Micronaut {version} includes the following changes:
 
 === Modularization
 
-Micronaut is now modular with parts of Micronaut being shifted into subprojects. See the following links for new subprojects that now have indepent release cycles outside of Micronaut core:
+Micronaut is now modular with parts of Micronaut being shifted into sub-projects. See the following links for new sub-projects that now have independent release cycles outside of Micronaut core:
 
 * https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/index.html[Micronaut Kafka]
 * https://micronaut-projects.github.io/micronaut-micrometer/1.1.x/guide/index.html[Micronaut Micrometer]
@@ -64,6 +64,12 @@ mn create-app hellorabbit --features rabbitmq
 ====
 
 See the https://micronaut-projects.github.io/micronaut-rabbitmq/latest/guide/[Micronaut RabbitMQ] documentation for more information.
+
+=== Compile Time Bean Introspection
+
+A compilation time replacement for jdk:java.beans.Introspector[] has been added which allows introspecting and creating bean instances without using reflection, improving performance, memory consumption and GraalVM support.
+
+See the new section on <<introspection, Bean Introspection>> for more information.
 
 === Cold Start and Performance Improvements
 
@@ -156,7 +162,7 @@ Note that api:http.server.types.files.SystemFile[] behaves differently from api:
 
 === Support for Freemarker Views
 
-Support for rendering <<freemarker,Freemaker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
+Support for rendering <<freemarker,Freemarker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
 
 === Constraint Bean Support
 
@@ -184,6 +190,10 @@ class CacheFactory {
 
 ----
 
+=== Support for JAsync SQL
+
+Support for https://micronaut-projects.github.io/micronaut-sql/1.1.x/guide/index.html#jasync[JAsync SQL] has been added, which includes non-blocking drivers for both Postgres and MySQL. Thanks to https://github.com/oshai[Ohad Shai] for contributing this feature.
+
 === Major Improvements for Multipart File Uploads
 
 Several issues and improvements have been made in regards to file uploads in comparison to the previous version of Micronaut. These fixes have been substantial enough that they have caused the behavior of uploads to change, however these changes should not break any existing use cases. To summarize the issues:
@@ -197,6 +207,12 @@ The following changes have been implemented:
 * Routes gain control of the data flow as soon as they are executed. A route cannot be executed until all of its arguments are fulfilled, so data will reside on memory or disk until the route can be executed.
 * After processing a chunk of data it is immediately released. For memory uploads this means the data is immediately freed. For disk uploads the data remains on disk until after processing.
 * Two new configuration options are available to support mixed uploads: `micronaut.server.multipart.mixed` and `micronaut.server.multipart.threshold`. When data needs to be buffered, mixed uploads will initially store data in memory. Once the threshold is reached, the data will be erased from memory and moved entirely onto disk.
+
+=== Option to Disable Environment Detection
+
+Environment detection can be disabled through a method on the application context builder, system property, or evnironment variable.
+
+See the <<environments, Environment>> documentation for more information.
 
 === Dependency Upgrades
 

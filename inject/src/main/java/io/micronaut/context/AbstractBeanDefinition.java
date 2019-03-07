@@ -628,7 +628,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     BeanInitializedEventListener listener = registration.getBean();
                     bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
                     if (bean == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");
                     }
                 }
             }
@@ -660,7 +660,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
-            if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
+            if (methodInjectionPoint.isPreDestroyMethod() && methodInjectionPoint.requiresReflection()) {
                 injectBeanMethod(resolutionContext, defaultContext, i, bean);
             }
         }
@@ -947,6 +947,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
         Argument<?> argument = constructorInjectionPoint.getArguments()[argIndex];
+        if (argument instanceof DefaultArgument) {
+            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
+            instrumentAnnotationMetadata(context, argument);
+        }
         Class argumentType = argument.getType();
         if (argumentType == BeanResolutionContext.class) {
             return resolutionContext;

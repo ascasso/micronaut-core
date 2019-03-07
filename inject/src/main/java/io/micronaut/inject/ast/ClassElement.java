@@ -40,6 +40,16 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * Find and return a single primary constructor. If more than constructor candidate exists, then return empty unless a
+     * constructor is found that is annotated with either {@link io.micronaut.core.annotation.Creator} or {@link javax.inject.Inject}.
+     *
+     * @return The primary constructor if one is present
+     */
+    default @Nonnull Optional<ConstructorElement> getPrimaryConstructor() {
+        return Optional.empty();
+    }
+
+    /**
      * Returns the super type of this element or empty if the element has no super type.
      *
      * @return An optional of the super type
@@ -120,6 +130,7 @@ public interface ClassElement extends TypedElement {
      *
      * @return True if this class element is an array
      */
+    @Override
     default boolean isArray() {
         return false;
     }
@@ -134,7 +145,7 @@ public interface ClassElement extends TypedElement {
     /**
      * @return The type arguments for this class element
      */
-    default Map<String, ClassElement> getTypeArguments() {
+    default @Nonnull Map<String, ClassElement> getTypeArguments() {
         return Collections.emptyMap();
     }
 
@@ -154,4 +165,5 @@ public interface ClassElement extends TypedElement {
     default boolean isAssignable(Class<?> type) {
         return isAssignable(type.getName());
     }
+
 }

@@ -748,7 +748,11 @@ abstract class AbstractOpenApiVisitor  {
 
     private Schema getPrimitiveType(String typeName) {
         Schema schema = null;
-        Optional<Class> aClass = ClassUtils.forName(typeName, getClass().getClassLoader());
+        Optional<Class> aClass = ClassUtils.getPrimitiveType(typeName);
+        if (!aClass.isPresent()) {
+            aClass = ClassUtils.forName(typeName, getClass().getClassLoader());
+        }
+
         if (aClass.isPresent()) {
             Class concreteType = aClass.get();
             Class wrapperType = ReflectionUtils.getWrapperType(concreteType);

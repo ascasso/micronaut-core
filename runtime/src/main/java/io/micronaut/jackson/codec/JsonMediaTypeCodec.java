@@ -28,6 +28,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
@@ -119,7 +120,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         try {
             return objectMapper.treeToValue(node, type.getType());
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -135,7 +136,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.readValue(buffer.toByteArray(), type.getType());
             }
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getType() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding JSON stream for type [" + type.getType() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -150,7 +151,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.readValue(data, type.getType());
             }
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -159,7 +160,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         try {
             objectMapper.writeValue(outputStream, object);
         } catch (IOException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage());
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
     }
 
@@ -172,7 +173,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.writeValueAsBytes(object);
             }
         } catch (JsonProcessingException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage());
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
     }
 
@@ -183,24 +184,8 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     private <T> JavaType constructJavaType(Argument<T> type) {
-        Map<String, Argument<?>> typeVariables = type.getTypeVariables();
         TypeFactory typeFactory = objectMapper.getTypeFactory();
-        JavaType[] objects = toJavaTypeArray(typeFactory, typeVariables);
-        return typeFactory.constructParametricType(
-            type.getType(),
-            objects
-        );
+        return JacksonConfiguration.constructType(type, typeFactory);
     }
 
-    private JavaType[] toJavaTypeArray(TypeFactory typeFactory, Map<String, Argument<?>> typeVariables) {
-        List<JavaType> javaTypes = new ArrayList<>();
-        for (Argument<?> argument : typeVariables.values()) {
-            if (argument.hasTypeVariables()) {
-                javaTypes.add(typeFactory.constructParametricType(argument.getType(), toJavaTypeArray(typeFactory, argument.getTypeVariables())));
-            } else {
-                javaTypes.add(typeFactory.constructType(argument.getType()));
-            }
-        }
-        return javaTypes.toArray(new JavaType[0]);
-    }
 }

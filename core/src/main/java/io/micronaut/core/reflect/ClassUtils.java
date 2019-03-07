@@ -16,9 +16,13 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -39,13 +43,45 @@ import java.util.*;
  */
 public class ClassUtils {
 
+    /**
+     * System property to indicate whether classloader logging should be activated. This is required
+     * because this class is used both at compilation time and runtime and we don't want logging at compilation time.
+     */
+    public static final String PROPERTY_MICRONAUT_CLASSLOADER_LOGGING = "micronaut.classloader.logging";
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>(34);
     public static final Map<String, Class> BASIC_TYPE_MAP = new HashMap<>(18);
     public static final String CLASS_EXTENSION = ".class";
-    
+
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
     static final boolean CLASS_LOADING_REPORTER_ENABLED;
+
+    private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
+
+    @SuppressWarnings("unchecked")
+    private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
+        "int", Integer.TYPE,
+            "boolean", Boolean.TYPE,
+            "long", Long.TYPE,
+            "byte", Byte.TYPE,
+            "double", Double.TYPE,
+            "float", Float.TYPE,
+            "char", Character.TYPE,
+            "short", Short.TYPE,
+            "void", void.class
+    );
+
+    @SuppressWarnings("unchecked")
+    private static final Map<String, Class> PRIMITIVE_ARRAY_MAP = CollectionUtils.mapOf(
+            "int", int[].class,
+            "boolean", boolean[].class,
+            "long", long[].class,
+            "byte", byte[].class,
+            "double", double[].class,
+            "float", float[].class,
+            "char", char[].class,
+            "short", short[].class
+    );
 
     static {
         COMMON_CLASS_MAP.put(boolean.class.getName(), boolean.class);
@@ -108,6 +144,18 @@ public class ClassUtils {
         } else {
             CLASS_LOADING_REPORTER_ENABLED = reporterList.stream().anyMatch(Toggleable::isEnabled);
         }
+    }
+
+    /**
+     * Returns the array type for the given primitive type name.
+     * @param primitiveType The primitive type name
+     * @return The array type
+     */
+    public static @Nonnull Optional<Class> arrayTypeForPrimitive(String primitiveType) {
+        if (primitiveType != null) {
+            return Optional.ofNullable(PRIMITIVE_ARRAY_MAP.get(primitiveType));
+        }
+        return Optional.empty();
     }
 
     /**
@@ -192,28 +240,7 @@ public class ClassUtils {
      * @return An optional type
      */
     public static Optional<Class> getPrimitiveType(String primitiveType) {
-        switch (primitiveType) {
-            case "byte":
-                return Optional.of(Byte.TYPE);
-            case "int":
-                return Optional.of(Integer.TYPE);
-            case "short":
-                return Optional.of(Short.TYPE);
-            case "long":
-                return Optional.of(Long.TYPE);
-            case "float":
-                return Optional.of(Float.TYPE);
-            case "double":
-                return Optional.of(Double.TYPE);
-            case "char":
-                return Optional.of(Character.TYPE);
-            case "boolean":
-                return Optional.of(Boolean.TYPE);
-            case "void":
-                return Optional.of(Void.TYPE);
-            default:
-                return Optional.empty();
-        }
+        return Optional.ofNullable(PRIMITIVE_TYPE_MAP.get(primitiveType));
     }
 
     /**
@@ -225,6 +252,7 @@ public class ClassUtils {
      * @return An optional of the class
      */
     public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
+        final Logger logger = ENABLE_CLASS_LOADER_LOGGING ? LoggerFactory.getLogger(ClassUtils.class) : null;
         try {
             if (classLoader == null) {
                 classLoader = Thread.currentThread().getContextClassLoader();
@@ -237,12 +265,21 @@ public class ClassUtils {
             if (commonType.isPresent()) {
                 return commonType;
             } else {
+                if (logger != null && logger.isDebugEnabled()) {
+                    logger.debug("Attempting to dynamically load class {}", name);
+                }
                 Class<?> type = Class.forName(name, true, classLoader);
                 ClassLoadingReporter.reportPresent(type);
+                if (logger != null && logger.isDebugEnabled()) {
+                    logger.debug("Successfully loaded class {}", name);
+                }
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             ClassLoadingReporter.reportMissing(name);
+            if (logger != null && logger.isDebugEnabled()) {
+                logger.debug("Class {} is not present", name);
+            }
             return Optional.empty();
         }
     }

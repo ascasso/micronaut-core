@@ -148,6 +148,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return True if the annotation is present
      */
     protected abstract boolean hasAnnotation(T element, Class<? extends Annotation> annotation);
+
     /**
      * Get the given type of the annotation.
      *
@@ -445,6 +446,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 annotationDefaults.put(entry.getKey().toString(), entry.getValue());
             }
             DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+        } else {
+            metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
         }
     }
 
@@ -516,6 +519,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         Collections.reverse(hierarchy);
         for (T currentElement : hierarchy) {
+            if (currentElement == null) {
+                continue;
+            }
             List<? extends A> annotationHierarchy = getAnnotationsForType(currentElement);
 
             if (annotationHierarchy.isEmpty()) {

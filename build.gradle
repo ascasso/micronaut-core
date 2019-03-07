@@ -31,7 +31,7 @@ apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
-    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
 }
 
 version project.projectVersion
@@ -207,7 +207,7 @@ ext {
                     version:micronautSqlVersion,
                     group:'io.micronaut.configuration',
                     name:'micronaut-hibernate-jpa',
-                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive']
+                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive', 'micronaut-jasync-sql']
             ],
             'micronaut.mongo': [
                     version:micronautMongoVersion,
@@ -484,7 +484,7 @@ subprojects { Project subproject ->
 
 
     repositories {
-        maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
+        maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
         maven { url "https://repo.grails.org/grails/core" }
     }
 
@@ -545,6 +545,7 @@ subprojects { Project subproject ->
         reports.html.enabled = !System.getenv("TRAVIS")
         reports.junitXml.enabled = !System.getenv("TRAVIS")
 
+        systemProperty "micronaut.cloud.platform", "OTHER"
     }
 
     tasks.withType(Checkstyle) {

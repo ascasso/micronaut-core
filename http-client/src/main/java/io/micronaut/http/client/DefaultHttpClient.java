@@ -347,7 +347,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(), createDefaultMediaTypeRegistry(),
+                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -360,7 +360,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
         this(
                 LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(), createDefaultMediaTypeRegistry(),
+                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -525,9 +525,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         Flowable<Event<ByteBuffer<?>>> eventFlowable = Flowable.create(emitter ->
                 dataStream(request).subscribe(new Subscriber<ByteBuffer<?>>() {
                     private Subscription dataSubscription;
-                    private CurrentEvent currentEvent = new CurrentEvent(
-                            byteBufferFactory.getNativeAllocator().compositeBuffer(10)
-                    );
+                    private CurrentEvent currentEvent;
 
                     @Override
                     public void onSubscribe(Subscription s) {
@@ -559,11 +557,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     );
                                 } finally {
                                     currentEvent.data.release();
+                                    currentEvent = null;
+                                }
+                            } else {
+                                if (currentEvent == null) {
                                     currentEvent = new CurrentEvent(
                                             byteBufferFactory.getNativeAllocator().compositeBuffer(10)
                                     );
                                 }
-                            } else {
                                 int colonIndex = buffer.indexOf((byte) ':');
                                 // SSE comments start with colon, so skip
                                 if (colonIndex > 0) {
@@ -1233,7 +1234,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         final SslContext sslCtx;
         if (uriObject.getScheme().equals("https")) {
             sslCtx = sslContext;
-            if (sslCtx == null) {
+            //Allow https requests to be sent if SSL is disabled but a proxy is present
+            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
                 throw new HttpClientException("Cannot send HTTPS request. SSL is disabled");
             }
         } else {
@@ -1941,8 +1943,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         );
     }
 
-    private static NettyClientSslBuilder createSslBuilder() {
-        return new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver());
+    private static NettyClientSslBuilder createSslBuilder(HttpClientConfiguration configuration) {
+        return new NettyClientSslBuilder(configuration.getSslConfiguration());
     }
 
     private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
@@ -2039,6 +2041,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 ch.config().setAutoRead(false);
             }
 
+            Optional<SocketAddress> proxy = configuration.getProxyAddress();
+
             if (sslContext != null) {
                 SslHandler sslHandler = sslContext.newHandler(
                         ch.alloc(),
@@ -2046,10 +2050,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         port
                 );
                 p.addFirst(HANDLER_SSL, sslHandler);
-            }
 
-            Optional<SocketAddress> proxy = configuration.getProxyAddress();
-            if (proxy.isPresent()) {
+                if (LOG.isDebugEnabled() && proxy.isPresent()) {
+                    LOG.debug("HttpClient proxy settings will be ignored because SSL is enabled");
+                }
+            } else if (proxy.isPresent()) {
                 Type proxyType = configuration.getProxyType();
                 SocketAddress proxyAddress = proxy.get();
                 configureProxy(p, proxyType, proxyAddress);
@@ -2116,7 +2121,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                 });
 
-                p.addLast(HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>() {
+                p.addLast(HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>(false) {
 
                     @Override
                     public boolean acceptInboundMessage(Object msg) {
@@ -2125,7 +2130,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                     @Override
                     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-                        ctx.fireChannelRead(new DefaultHttpContent(msg.retain()));
+                        ctx.fireChannelRead(new DefaultHttpContent(msg));
                     }
                 });
             }

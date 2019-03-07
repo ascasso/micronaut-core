@@ -26,11 +26,9 @@ import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -40,10 +38,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StreamUtils;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.*;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
@@ -66,7 +61,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -115,7 +109,6 @@ public class DefaultBeanContext implements BeanContext {
             BeanInitializedEventListener.class
     );
     private final CustomScopeRegistry customScopeRegistry;
-    private final ResourceLoader resourceLoader;
     private Collection<BeanRegistration<BeanCreatedEventListener>> beanCreationEventListeners;
 
     /**
@@ -130,8 +123,15 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param classLoader The class loader
      */
-    public DefaultBeanContext(ClassLoader classLoader) {
-        this(ClassPathResourceLoader.defaultLoader(classLoader));
+    public DefaultBeanContext(@Nonnull ClassLoader classLoader) {
+        this(new BeanContextConfiguration() {
+            @Nonnull
+            @Override
+            public ClassLoader getClassLoader() {
+                ArgumentUtils.requireNonNull("classLoader", classLoader);
+                return classLoader;
+            }
+        });
     }
 
     /**
@@ -139,9 +139,26 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param resourceLoader The resource loader
      */
-    public DefaultBeanContext(ClassPathResourceLoader resourceLoader) {
-        this.classLoader = resourceLoader.getClassLoader();
-        this.resourceLoader = resourceLoader;
+    public DefaultBeanContext(@Nonnull ClassPathResourceLoader resourceLoader) {
+        this(new BeanContextConfiguration() {
+            @Nonnull
+            @Override
+            public ClassLoader getClassLoader() {
+                ArgumentUtils.requireNonNull("resourceLoader", resourceLoader);
+                return resourceLoader.getClassLoader();
+            }
+        });
+    }
+
+    /**
+     * Creates a new bean context with the given configuration.
+     * @param contextConfiguration The context configuration
+     */
+    public DefaultBeanContext(@Nonnull BeanContextConfiguration contextConfiguration) {
+        ArgumentUtils.requireNonNull("contextConfiguration", contextConfiguration);
+        // enable classloader logging
+        System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
+        this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
 
         // startup optimization.. index Jackson modules
@@ -2046,12 +2063,14 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>(20);
         List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
-        List<BeanDefinitionReference> allReferences = new ArrayList<>(beanDefinitionReferences.size());
+        List<BeanDefinitionReference> disabled = new ArrayList<>(20);
+
+        final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
+
+        beanDefinitionsClasses.addAll(beanDefinitionReferences);
 
         Map<BeanConfiguration, Boolean> configurationEnabled = beanConfigurations.values().stream()
                 .collect(Collectors.toMap(Function.identity(), bc -> bc.isEnabled(this)));
-
-        final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
 
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
             boolean disabledByConfiguration = beanConfigurations.values()
@@ -2060,12 +2079,13 @@ public class DefaultBeanContext implements BeanContext {
                     .anyMatch(c -> !configurationEnabled.get(c));
 
             if (disabledByConfiguration) {
+                disabled.add(beanDefinitionReference);
+
                 if (reportingEnabled) {
                     ClassLoadingReporter.reportMissing(beanDefinitionReference.getBeanDefinitionName());
                     ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
                 }
             } else {
-                allReferences.add(beanDefinitionReference);
                 if (beanDefinitionReference.isContextScope()) {
                     contextScopeBeans.add(beanDefinitionReference);
                 }
@@ -2075,26 +2095,31 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        this.beanDefinitionsClasses.addAll(allReferences);
-
-        allReferences.forEach(this::indexBeanDefinitionIfNecessary);
+        beanDefinitionsClasses.removeAll(disabled);
+        beanDefinitionsClasses.forEach(this::indexBeanDefinitionIfNecessary);
+        disabled.clear();
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
     }
 
     private void indexBeanDefinitionIfNecessary(BeanDefinitionReference beanDefinitionReference) {
-        Optional<Class> indexedType = beanDefinitionReference.getAnnotationMetadata().classValue(Indexed.class);
-        if (indexedType.isPresent()) {
-            final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
-            indexed.add(beanDefinitionReference);
+        final List<AnnotationValue<Indexed>> indexes = beanDefinitionReference.getAnnotationMetadata().getAnnotationValuesByType(Indexed.class);
+        if (CollectionUtils.isNotEmpty(indexes)) {
+            for (AnnotationValue<Indexed> index : indexes) {
+                final Class indexedType = index.getValue(Class.class).orElse(null);
+                if (indexedType != null) {
+                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
+                    indexed.add(beanDefinitionReference);
+                }
+            }
         } else if (beanDefinitionReference.isPresent()) {
             final Class beanType = beanDefinitionReference.getBeanType();
             if (indexedTypes.contains(beanType)) {
                 final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
                 indexed.add(beanDefinitionReference);
             } else {
-                indexedType = indexedTypes.stream().filter(t ->
+                Optional<Class> indexedType = indexedTypes.stream().filter(t ->
                         t == beanType || t.isAssignableFrom(beanType)
                 ).findFirst();
                 if (indexedType.isPresent()) {
